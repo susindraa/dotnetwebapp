@@ -1,1 +1,48 @@
+pipeline {
+    agent any
 
+    stages {
+        // Build Stage
+        stage('Build') { 
+            steps {
+                echo "Restoring .NET dependencies..."
+                sh 'dotnet restore' 
+                
+                echo "Building the .NET application..."
+                sh 'dotnet build --no-restore'
+            }
+        }
+
+        // Test Stage
+        stage('Test') {
+            steps {
+                echo "Running tests with code coverage..."
+                sh 'dotnet test --no-build --no-restore --collect "XPlat Code Coverage"'
+            }
+            post {
+                always {
+                    echo "Publishing code coverage report..."
+                    publishCoverage(
+                        adapters: [
+                            coberturaAdapter(
+                                // Path to the Cobertura-style coverage file
+                                'SimpleWebApi.Test/TestResults/*/coverage.cobertura.xml'
+                            )
+                        ]
+                    )
+                }
+            }
+        }
+
+        // Deliver Stage
+        stage('Deliver') {
+            steps {
+                echo "Publishing the application..."
+                sh 'dotnet publish SimpleWebApi --no-restore -o published'
+                
+                echo "Archiving published artifacts..."
+                archiveArtifacts 'published/*.*'
+            }
+        }
+    }
+}
